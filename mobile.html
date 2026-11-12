@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>SigmaVision — GPS Tracker</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;900&family=DM+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --carbon: #000000;
+      --paper:  #ffffff;
+      --sky:    #dceeff;
+      --gray:   #cccccc;
+      --blue:   #4da2ff;
+      --mint:   #55db9c;
+      --lav:    #e9ccff;
+      --ember:  #fb4903;
+      --sun:    #ffd731;
+      --violet: #5c4ade;
+      --f-disp: 'Barlow Condensed', Impact, sans-serif;
+      --f-ui:   'DM Sans', ui-sans-serif, sans-serif;
+      --f-mono: 'IBM Plex Mono', ui-monospace, monospace;
+    }
+
+    * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+    html, body { width:100%; height:100%; background:var(--sky); font-family:var(--f-ui); overflow:hidden; color:var(--carbon); }
+
+    .app { display:flex; flex-direction:column; width:100%; height:100dvh; }
+
+    /* ── Marquee ── */
+    .marquee-wrap { background:var(--carbon); overflow:hidden; flex-shrink:0; }
+    .marquee-track {
+      display:flex; white-space:nowrap; width:max-content;
+      animation:mq 22s linear infinite; padding:7px 0;
+    }
+    .marquee-track span { font-family:var(--f-mono); font-weight:700; font-size:10px; letter-spacing:0.08em; color:var(--paper); }
+    @keyframes mq { from{transform:translateX(0)} to{transform:translateX(-50%)} }
+
+    /* ── Header ── */
+    .header {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:10px 16px;
+      background:var(--sky);
+      border-bottom:2px solid var(--carbon);
+      flex-shrink:0; z-index:10;
+    }
+    .brand { display:flex; align-items:center; gap:8px; }
+    .brand-icon {
+      width:32px; height:32px; border-radius:9999px;
+      border:2px solid var(--carbon); background:var(--paper);
+      display:flex; align-items:center; justify-content:center;
+      font-family:var(--f-disp); font-size:17px; font-weight:900; color:var(--carbon);
+    }
+    .brand-name { font-family:var(--f-ui); font-size:15px; font-weight:700; letter-spacing:-0.01em; color:var(--carbon); }
+    .ws-pill {
+      display:flex; align-items:center; gap:5px;
+      padding:5px 12px; border-radius:9999px;
+      background:var(--paper); border:1.5px solid var(--carbon);
+      font-family:var(--f-mono); font-size:9px; font-weight:700;
+      text-transform:uppercase; letter-spacing:0.1em; color:var(--carbon);
+      box-shadow:2px 2px 0 var(--carbon);
+    }
+    .dot { width:7px; height:7px; border-radius:50%; background:var(--gray); flex-shrink:0; border:1.5px solid var(--carbon); transition:background 0.3s; }
+    .dot.green { background:var(--mint); animation:dpulse 1.8s ease-in-out infinite; }
+    .dot.red   { background:var(--ember); }
+    @keyframes dpulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.75)} }
+
+    /* ── Map ── */
+    #map { flex:1; width:100%; min-height:0; z-index:1; }
+    .map-wrap { position:relative; flex:1; min-height:0; display:flex; flex-direction:column; }
+
+    /* map controls */
+    .map-controls {
+      position:absolute; top:10px; left:10px; z-index:500;
+      display:flex; gap:3px;
+      background:var(--paper); border:2px solid var(--carbon);
+      border-radius:12px; padding:3px;
+      box-shadow:3px 3px 0 var(--carbon);
+    }
+    .map-ctrl-btn {
+      padding:5px 12px; border-radius:8px; border:none;
+      font-family:var(--f-mono); font-size:9px; font-weight:700;
+      text-transform:uppercase; letter-spacing:0.08em;
+      cursor:pointer; background:transparent; color:var(--carbon); opacity:.4; transition:all 0.15s;
+    }
+    .map-ctrl-btn.active { background:var(--carbon); color:var(--paper); opacity:1; }
+
+    /* ── Bottom panel ── */
+    .bottom {
+      flex-shrink:0;
+      background:var(--paper);
+      border-top:2.5px solid var(--carbon);
+      padding:14px 16px 20px;
+      z-index:10;
+      display:flex; flex-direction:column; gap:10px;
+    }
+
+    /* status band */
+    .status-band {
+      background:var(--sky); border:1.5px solid var(--carbon); border-radius:12px;
+      padding:8px 12px; display:flex; align-items:center; justify-content:space-between;
+    }
+    .status-left { display:flex; align-items:center; gap:7px; }
+    .status-label { font-family:var(--f-mono); font-size:9px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:var(--carbon); opacity:.5; }
+    .status-val   { font-family:var(--f-mono); font-size:9px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:var(--carbon); }
+
+    /* stats grid */
+    .stats { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+    .stat {
+      background:var(--sky); border:2px solid var(--carbon);
+      border-radius:14px; padding:10px 10px 8px;
+      box-shadow:2px 2px 0 var(--carbon);
+    }
+    .stat-label {
+      font-family:var(--f-mono); font-size:8px; font-weight:700;
+      text-transform:uppercase; letter-spacing:0.12em;
+      color:var(--carbon); opacity:.4; margin-bottom:4px;
+    }
+    .stat-val {
+      font-family:var(--f-disp); font-size:16px; font-weight:900; line-height:1;
+      color:var(--carbon); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+    .stat-val.live { color:var(--mint); }
+
+    /* GPS button */
+    .gps-btn {
+      width:100%; padding:16px;
+      background:var(--carbon); border:2.5px solid var(--carbon);
+      border-radius:9999px;
+      font-family:var(--f-ui); font-size:14px; font-weight:700;
+      text-transform:uppercase; letter-spacing:0.032em;
+      color:var(--paper); cursor:pointer;
+      box-shadow:4px 4px 0 var(--mint);
+      transition:transform 0.12s, box-shadow 0.12s;
+      display:flex; align-items:center; justify-content:center; gap:8px;
+      -webkit-user-select:none; user-select:none;
+    }
+    .gps-btn:active { transform:scale(0.97); box-shadow:2px 2px 0 var(--mint); }
+    .gps-btn.on {
+      background:var(--mint); color:var(--carbon);
+      box-shadow:4px 4px 0 var(--carbon);
+    }
+    .btn-dot { width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,0.4); border:1.5px solid rgba(255,255,255,0.6); }
+    .gps-btn.on .btn-dot { background:var(--carbon); border-color:var(--carbon); animation:dpulse 1.5s infinite; }
+
+    /* accent band at bottom of stats */
+    .accent-row { display:flex; gap:6px; }
+    .accent-pill {
+      flex:1; padding:6px 10px; border-radius:9999px;
+      border:1.5px solid var(--carbon);
+      font-family:var(--f-mono); font-size:8px; font-weight:700;
+      text-transform:uppercase; letter-spacing:0.1em; color:var(--carbon);
+      text-align:center;
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Marquee -->
+  <div class="marquee-wrap">
+    <div class="marquee-track">
+      <span>&nbsp;&nbsp;+&nbsp;SIGMAVISION&nbsp;&nbsp;+&nbsp;LIVE GPS&nbsp;&nbsp;+&nbsp;IOT TRACKER&nbsp;&nbsp;+&nbsp;REAL-TIME LOCATION&nbsp;&nbsp;+&nbsp;S.I.G.M.A&nbsp;&nbsp;+&nbsp;SMARTCANE SYSTEM&nbsp;&nbsp;</span>
+      <span>&nbsp;&nbsp;+&nbsp;SIGMAVISION&nbsp;&nbsp;+&nbsp;LIVE GPS&nbsp;&nbsp;+&nbsp;IOT TRACKER&nbsp;&nbsp;+&nbsp;REAL-TIME LOCATION&nbsp;&nbsp;+&nbsp;S.I.G.M.A&nbsp;&nbsp;+&nbsp;SMARTCANE SYSTEM&nbsp;&nbsp;</span>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="brand">
+      <div class="brand-icon">S</div>
+      <span class="brand-name">SigmaVision</span>
+    </div>
+    <div class="ws-pill">
+      <div class="dot" id="wsDot"></div>
+      <span id="wsLabel">Offline</span>
+    </div>
+  </div>
+
+  <!-- Map -->
+  <div class="map-wrap">
+    <div id="map"></div>
+    <div class="map-controls">
+      <button class="map-ctrl-btn active" id="btnStreet" onclick="setStyle('street')">Street</button>
+      <button class="map-ctrl-btn"        id="btnSat"    onclick="setStyle('satellite')">Sat</button>
+    </div>
+  </div>
+
+  <!-- Bottom panel -->
+  <div class="bottom">
+
+    <!-- server status -->
+    <div class="status-band">
+      <div class="status-left">
+        <div class="dot" id="connDot"></div>
+        <span class="status-label">Server</span>
+        <span class="status-val" id="connLabel">Not connected</span>
+      </div>
+      <span class="status-val" id="accLabel" style="opacity:.4">Accuracy: —</span>
+    </div>
+
+    <!-- stats -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">Area</div>
+        <div class="stat-val" id="dArea" style="font-size:11px;font-family:var(--f-ui);font-weight:700;line-height:1.2;">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Lat</div>
+        <div class="stat-val" id="dLat" style="font-size:13px;">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Lng</div>
+        <div class="stat-val" id="dLng" style="font-size:13px;">—</div>
+      </div>
+    </div>
+
+    <!-- accent info pills -->
+    <div class="accent-row">
+      <div class="accent-pill" style="background:#dceeff;">IoT Tracker</div>
+      <div class="accent-pill" style="background:#55db9c;">GPS Active</div>
+      <div class="accent-pill" style="background:#e9ccff;">S.I.G.M.A</div>
+    </div>
+
+    <!-- GPS button -->
+    <button class="gps-btn" id="gpsBtn" onclick="toggleGPS()">
+      <div class="btn-dot"></div>
+      Enable GPS Tracking
+    </button>
+
+    <!-- Sync profile button -->
+    <button onclick="refreshMarker()" style="width:100%;padding:11px;background:var(--paper);border:2px solid var(--carbon);border-radius:9999px;font-family:var(--f-ui);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.032em;color:var(--carbon);cursor:pointer;box-shadow:3px 3px 0 var(--violet);margin-top:-4px;">
+      Sync Profile from Dashboard
+    </button>
+
+  </div>
+</div>
+
+<script>
+  /* ── Room ID from URL param ── */
+  var ROOM_ID = (new URLSearchParams(location.search)).get('room') || 'default';
+  var ws=null,wsRetry=3000,gpsActive=false,lastLat=null,lastLng=null,wakeLock=null;
+
+  var map=null,marker=null,tileLayer=null,watchId=null,keepAliveTimer=null;
+
+  var TILE_STREET    = 'https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}.png?apiKey=6d36f27f1b484652a790046801c3a272';
+  var TILE_SATELLITE = 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
+
+  /* ── Build marker icon ── */
+  function buildIcon(pfp, accent) {
+    var size = 46;
+    var color = accent || '#55db9c';
+    var imgTag = pfp
+      ? '<img src="'+pfp+'" '
+        + 'style="width:100%;height:100%;object-fit:contain;object-position:center top;display:block;" '
+        + 'onerror="this.style.display=\'none\'" />'
+      : '';
+    var html = '<div style="width:'+size+'px;height:'+size+'px;border-radius:50%;border:3px solid #000;overflow:hidden;background:'+color+';box-shadow:3px 3px 0 #000;display:flex;align-items:center;justify-content:center;">'
+      + imgTag
+      + '</div>'
+      + '<div style="width:10px;height:10px;border-radius:50%;background:'+color+';border:2px solid #000;margin:-2px auto 0;"></div>';
+    return L.divIcon({ html:html, className:'', iconSize:[size,size+12], iconAnchor:[size/2,size+12] });
+  }
+
+  function buildDefaultIcon() {
+    var html = '<div style="width:22px;height:22px;border-radius:50%;background:#55db9c;border:3px solid #000;box-shadow:2px 2px 0 #000;"></div>';
+    return L.divIcon({ html:html, className:'', iconSize:[22,22], iconAnchor:[11,11] });
+  }
+
+  function refreshMarker() {
+    var profile=null;
+    try { profile=JSON.parse(localStorage.getItem('sigma_profile')); } catch(e){}
+    var icon = (profile && profile.image) ? buildIcon(profile.image, profile.accent) : buildDefaultIcon();
+    if (marker) { marker.setIcon(icon); }
+    // show profile name in status
+    if (profile && profile.name) {
+      document.getElementById('dArea').textContent = 'Tracking: '+profile.name;
+    }
+  }
+
+  /* ── Wake Lock ── */
+  async function requestWakeLock() {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', function() { if (gpsActive && document.visibilityState==='visible') requestWakeLock(); });
+      }
+    } catch(e) {}
+  }
+  function releaseWakeLock() { if (wakeLock) { wakeLock.release(); wakeLock=null; } }
+
+  /* ── Map style ── */
+  function setStyle(s) {
+    if (!map) return;
+    if (tileLayer) map.removeLayer(tileLayer);
+    tileLayer = L.tileLayer(s==='satellite'?TILE_SATELLITE:TILE_STREET,{maxZoom:19}).addTo(map);
+    document.getElementById('btnStreet').classList.toggle('active',s==='street');
+    document.getElementById('btnSat').classList.toggle('active',s==='satellite');
+  }
+  window.setStyle = setStyle;
+
+  /* ── GPS ── */
+  function toggleGPS() { if (gpsActive) stopGPS(); else startGPS(); }
+  window.toggleGPS = toggleGPS;
+
+  function startGPS() {
+    if (!navigator.geolocation) { alert('GPS not supported.'); return; }
+    var btn=document.getElementById('gpsBtn');
+    btn.innerHTML='<div class="btn-dot"></div> Requesting GPS...';
+    watchId = navigator.geolocation.watchPosition(onPos,onErr,{enableHighAccuracy:true,maximumAge:0,timeout:20000});
+    keepAliveTimer = setInterval(function(){
+      navigator.geolocation.getCurrentPosition(onPos,function(){},{enableHighAccuracy:true,maximumAge:10000,timeout:10000});
+    },5000);
+    gpsActive=true;
+    btn.innerHTML='<div class="btn-dot"></div> GPS Active — Tap to Stop';
+    btn.classList.add('on');
+    requestWakeLock();
+  }
+
+  function stopGPS() {
+    if (watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;}
+    if (keepAliveTimer!==null){clearInterval(keepAliveTimer);keepAliveTimer=null;}
+    releaseWakeLock(); gpsActive=false;
+    var btn=document.getElementById('gpsBtn');
+    btn.innerHTML='<div class="btn-dot"></div> Enable GPS Tracking';
+    btn.classList.remove('on');
+  }
+
+  document.addEventListener('visibilitychange',function(){
+    if (document.visibilityState==='visible'&&gpsActive){
+      requestWakeLock();
+      navigator.geolocation.getCurrentPosition(onPos,function(){},{enableHighAccuracy:true,maximumAge:0,timeout:10000});
+    }
+  });
+
+  function onPos(pos) {
+    var lat=pos.coords.latitude,lng=pos.coords.longitude,acc=pos.coords.accuracy;
+    lastLat=lat; lastLng=lng;
+    document.getElementById('dLat').textContent=lat.toFixed(5);
+    document.getElementById('dLng').textContent=lng.toFixed(5);
+    document.getElementById('accLabel').textContent='Acc: '+Math.round(acc)+'m';
+    document.getElementById('dLat').classList.add('live');
+    document.getElementById('dLng').classList.add('live');
+    /* L.marker supports setLatLng; always use it */
+    if (marker){ marker.setLatLng([lat,lng]); }
+    map.setView([lat,lng],map.getZoom()||15);
+    sendToServer({lat:lat,lng:lng,accuracy:acc,timestamp:Date.now()});
+    fetch('https://nominatim.openstreetmap.org/reverse?lat='+lat+'&lon='+lng+'&format=json')
+      .then(function(r){return r.json();})
+      .then(function(d){
+        var name=d.address&&(d.address.suburb||d.address.village||d.address.town||d.address.city||d.address.county)||'Unknown area';
+        document.getElementById('dArea').textContent=name;
+      }).catch(function(){});
+  }
+
+  function onErr(e) {
+    var btn=document.getElementById('gpsBtn');
+    btn.innerHTML='<div class="btn-dot"></div> GPS Error — Tap to Retry';
+    btn.classList.remove('on'); gpsActive=false;
+  }
+
+  function sendToServer(data) {
+    var payload = Object.assign({}, data, { roomId: ROOM_ID });
+    var json=JSON.stringify(payload);
+    if (ws&&ws.readyState===WebSocket.OPEN){
+      ws.send(JSON.stringify({ type:'gps', roomId: ROOM_ID, lat:data.lat, lng:data.lng, accuracy:data.accuracy, timestamp:data.timestamp }));
+      return;
+    }
+    fetch('/location?room='+encodeURIComponent(ROOM_ID),{method:'POST',headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'true'},body:json}).catch(function(){});
+  }
+
+  /* ── WebSocket ── */
+  function connectWS() {
+    try {
+      var proto=location.protocol==='https:'?'wss:':'ws:';
+      ws=new WebSocket(proto+'//'+location.host);
+      ws.onopen=function(){wsRetry=3000;setConn(true);};
+      ws.onclose=function(){setConn(false);wsRetry=Math.min(wsRetry*1.5,30000);setTimeout(connectWS,wsRetry);};
+      ws.onerror=function(){setConn(false);};
+      ws.onmessage=function(){};
+    } catch(e){ setTimeout(connectWS,wsRetry); }
+  }
+
+  function setConn(ok) {
+    document.getElementById('wsDot').className='dot '+(ok?'green':'red');
+    document.getElementById('wsLabel').textContent=ok?'Online':'Offline';
+    document.getElementById('connDot').className='dot '+(ok?'green':'red');
+    document.getElementById('connLabel').textContent=ok?'Connected':'Reconnecting...';
+  }
+
+  /* ── Init ── */
+  window.addEventListener('DOMContentLoaded',function(){
+    map=L.map('map',{zoomControl:false,attributionControl:false}).setView([13.6218,123.1941],15);
+    setStyle('street');
+
+    /* start with default icon — always L.marker */
+    marker = L.marker([13.6218,123.1941],{icon:buildDefaultIcon()}).addTo(map);
+
+    /* load profile from localStorage immediately */
+    refreshMarker();
+
+    /* update if profile changes in another tab */
+    window.addEventListener('storage',function(e){
+      if (e.key==='sigma_profile') refreshMarker();
+    });
+
+    setTimeout(function(){map.invalidateSize();},500);
+    connectWS();
+  });
+</script>
+</body>
+</html>
+

@@ -1,0 +1,59 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body, #root {
+  width: 100%;
+  font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+}
+
+html { height: 100%; }
+
+body {
+  min-height: 100%;
+  overflow-x: hidden;
+}
+
+#root { min-height: 100%; }
+
+/* Leaflet */
+.leaflet-container { background: #dceeff; }
+
+/* Scrollbar — neutral, no purple */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); border-radius: 2px; }
+
+/* Global focus-visible ring — anti-slop requirement (WCAG 2.1 AA SC 2.4.7) */
+:focus-visible {
+  outline: 2px solid #000000;
+  outline-offset: 2px;
+}
+/* Inputs get a border-based focus ring instead of outline */
+input:focus-visible {
+  outline: none;
+  border-color: #000000 !important;
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.12);
+}
+/* Remove browser default on elements that implement their own visible state */
+button:focus-visible {
+  outline: 2px solid #000000;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Input autofill — no purple tint */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #000;
+  -webkit-box-shadow: 0 0 0px 1000px #dceeff inset;
+  transition: background-color 5000s ease-in-out 0s;
+}

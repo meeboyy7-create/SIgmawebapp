@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "anti-slop-design": {
+      "source": "wwewtech/anti-slop-design",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "66a7dd81297af145c827b0de4c202a899b17052641424a2a881b0c704b9de0e1"
+    }
+  }
+}
