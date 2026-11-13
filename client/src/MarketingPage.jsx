@@ -653,14 +653,11 @@ export default function MarketingPage({ onEnter, user, onLogout }) {
     const connect = () => {
       try {
         const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-        const host  = window.location.hostname;
-        const wsUrl = proto === 'wss'
-          ? `wss://${host}`
-          : `ws://${host}:3000`;
+        const host  = window.location.host; // includes port if any (e.g. localhost:3000)
+        const wsUrl = `${proto}://${host}`;
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
         ws.onopen = () => {
-          /* ── JOIN this user's room so only their GPS comes through ── */
           ws.send(JSON.stringify({ type: 'join', roomId }));
         };
         ws.onclose = () => { if (alive) setTimeout(connect, ms); ms = Math.min(ms * 1.5, 30000); };
@@ -846,6 +843,7 @@ export default function MarketingPage({ onEnter, user, onLogout }) {
         {/* hero text — full size always */}
         <div style={{ position:'absolute', inset:0, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'flex-start', paddingTop: isAuth ? 'clamp(14px,2vh,24px)' : 'clamp(52px,8vh,88px)', zIndex:2, pointerEvents:'none', userSelect:'none', textAlign:'center' }}>
           <BlurText text="SIGMAVISION" animateBy="letters" delay={50} direction="top" stepDuration={0.34}
+            key={isAuth ? 'auth' : 'noauth'}
             className="sigma-title"
             style={{ fontFamily:S.f.disp, fontWeight:900, fontSize:'clamp(80px,16vw,220px)', lineHeight:0.8, letterSpacing:'0.01em', textTransform:'uppercase', color:isAuth?S.paper:S.carbon, justifyContent:'center', whiteSpace:'nowrap' }}/>
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
 import MarketingPage from './MarketingPage';
@@ -37,11 +37,20 @@ export default function App() {
   const cleanPath = rawPath === '' ? '/' : rawPath.replace(/\/+$/, '') || '/';
   const is404     = !VALID_PATHS.has(cleanPath);
 
+  const prevAuthRef = useRef(null);
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
+      const wasAuth = prevAuthRef.current;
+      prevAuthRef.current = !!u;
       setUser(u);
       setAuthLoading(false);
       if (u) setShowAuth(false);
+      // If transitioning from logged-out → logged-in, replay entrance animation
+      if (!wasAuth && u) {
+        setEntered(false);
+        setTimeout(() => setEntered(true), 60);
+      }
     });
     return unsub;
   }, []);

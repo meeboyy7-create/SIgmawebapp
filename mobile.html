@@ -369,24 +369,42 @@
 
   function sendToServer(data) {
     var payload = Object.assign({}, data, { roomId: ROOM_ID });
-    var json=JSON.stringify(payload);
-    if (ws&&ws.readyState===WebSocket.OPEN){
-      ws.send(JSON.stringify({ type:'gps', roomId: ROOM_ID, lat:data.lat, lng:data.lng, accuracy:data.accuracy, timestamp:data.timestamp }));
+    var json = JSON.stringify(payload);
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      /* send both type:'gps' and flat lat/lng so server handles both paths */
+      ws.send(JSON.stringify({
+        type: 'gps',
+        roomId: ROOM_ID,
+        lat: data.lat,
+        lng: data.lng,
+        accuracy: data.accuracy,
+        timestamp: data.timestamp
+      }));
       return;
     }
-    fetch('/location?room='+encodeURIComponent(ROOM_ID),{method:'POST',headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'true'},body:json}).catch(function(){});
+    /* HTTP fallback with room param */
+    fetch('/location?room=' + encodeURIComponent(ROOM_ID), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+      body: json
+    }).catch(function() {});
   }
 
   /* ── WebSocket ── */
   function connectWS() {
     try {
-      var proto=location.protocol==='https:'?'wss:':'ws:';
-      ws=new WebSocket(proto+'//'+location.host);
-      ws.onopen=function(){wsRetry=3000;setConn(true);};
-      ws.onclose=function(){setConn(false);wsRetry=Math.min(wsRetry*1.5,30000);setTimeout(connectWS,wsRetry);};
-      ws.onerror=function(){setConn(false);};
-      ws.onmessage=function(){};
-    } catch(e){ setTimeout(connectWS,wsRetry); }
+      var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(proto + '//' + location.host);
+      ws.onopen = function() {
+        wsRetry = 3000;
+        setConn(true);
+        /* mobile joins the room too so server knows about this connection */
+        ws.send(JSON.stringify({ type: 'mobile', roomId: ROOM_ID }));
+      };
+      ws.onclose = function() { setConn(false); wsRetry = Math.min(wsRetry * 1.5, 30000); setTimeout(connectWS, wsRetry); };
+      ws.onerror = function() { setConn(false); };
+      ws.onmessage = function() {};
+    } catch(e) { setTimeout(connectWS, wsRetry); }
   }
 
   function setConn(ok) {
