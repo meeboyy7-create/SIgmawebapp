@@ -647,13 +647,13 @@ export default function MarketingPage({ onEnter, user, onLogout }) {
 
   /* GPS WebSocket — auth only */
   useEffect(() => {
-    if (!isAuth) return;
-    const roomId = user?.uid || 'default';
+    if (!isAuth || !user?.uid) return;
+    const roomId = user.uid;
     let alive = true, ms = 3000;
     const connect = () => {
       try {
         const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-        const host  = window.location.host; // includes port if any (e.g. localhost:3000)
+        const host  = window.location.host;
         const wsUrl = `${proto}://${host}`;
         const ws = new WebSocket(wsUrl);
         wsRef.current = ws;
@@ -693,7 +693,7 @@ export default function MarketingPage({ onEnter, user, onLogout }) {
     };
     connect();
     return () => { alive = false; wsRef.current?.close(); };
-  }, [isAuth]);
+  }, [isAuth, user?.uid]);
 
   /* Scroll / animation */
   useEffect(() => {
@@ -994,7 +994,12 @@ export default function MarketingPage({ onEnter, user, onLogout }) {
             </div>
             {/* orbit stack — inside a scroll-visible container */}
             <div style={{ maxWidth:1060,margin:'0 auto',paddingBottom:40 }}>
-              <OrbitCardStack onSelect={(item) => { setActiveProfile(item); setPanel(null); }}/>
+              <OrbitCardStack onSelect={(item) => {
+                setActiveProfile(item);
+                setPanel(null);
+                /* write to localStorage so mobile sync button can read it */
+                try { localStorage.setItem('sigma_profile', JSON.stringify({ name: item.name, image: item.image, accent: item.accent })); } catch(e) {}
+              }}/>
             </div>
           </div>
         </>
@@ -1011,7 +1016,7 @@ export default function MarketingPage({ onEnter, user, onLogout }) {
             setDisplayName={setDisplayName}
             editingName={editingName}
             setEditingName={setEditingName}
-            onClear={() => setActiveProfile(null)}
+            onClear={() => { setActiveProfile(null); try { localStorage.removeItem('sigma_profile'); } catch(e) {} }}
           />
         </div>
       )}
