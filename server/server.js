@@ -76,11 +76,20 @@ app.post('/location', (req, res) => {
   const { lat, lng, accuracy, timestamp } = req.body;
   if (!lat || !lng) return res.status(400).json({ error: 'Missing lat/lng' });
 
-  const room = getRoom(roomId);
-  room.location = { lat, lng, accuracy, timestamp: timestamp || Date.now() };
+  const loc = { lat, lng, accuracy, timestamp: timestamp || Date.now() };
+  getRoom(roomId).location = loc;
   console.log(`[GPS] room=${roomId}  ${lat},${lng}`);
 
-  broadcast(roomId, { type: 'location', lat, lng, accuracy });
+  // broadcast to the specific room
+  broadcast(roomId, { type: 'location', ...loc });
+
+  // also broadcast to ALL rooms with dashboard clients as fallback
+  rooms.forEach((room, rId) => {
+    if (rId !== roomId && room.clients.size > 0) {
+      broadcast(rId, { type: 'location', ...loc });
+    }
+  });
+
   res.json({ ok: true });
 });
 
@@ -133,20 +142,27 @@ wss.on('connection', (ws, req) => {
     }
 
     // ── Mobile sends GPS ──
-    if ((data.type === 'gps' || (data.lat && data.lng)) && data.roomId) {
-      const rid = data.roomId;
+    if ((data.type === 'gps' || (data.lat && data.lng))) {
+      const rid = data.roomId || roomId || 'default';
       const loc = { lat: data.lat, lng: data.lng, accuracy: data.accuracy, timestamp: data.timestamp || Date.now() };
       getRoom(rid).location = loc;
       console.log(`[WS GPS] room=${rid}  ${loc.lat},${loc.lng}`);
-      broadcast(rid, { type: 'location', ...loc });
-      return;
-    }
 
-    // ── Legacy: no roomId — broadcast to 'default' ──
-    if (data.lat && data.lng) {
-      const loc = { lat: data.lat, lng: data.lng, accuracy: data.accuracy };
-      getRoom('default').location = loc;
-      broadcast('default', { type: 'location', ...loc });
+      // broadcast to that room
+      broadcast(rid, { type: 'location', ...loc });
+
+      // ALSO broadcast to 'default' room clients as fallback
+      if (rid !== 'default') {
+        broadcast('default', { type: 'location', ...loc });
+      }
+
+      // ALSO broadcast to ALL other rooms that have clients (single-user fallback)
+      rooms.forEach((room, rId) => {
+        if (rId !== rid && rId !== 'default' && room.clients.size > 0) {
+          broadcast(rId, { type: 'location', ...loc });
+        }
+      });
+      return;
     }
   });
 

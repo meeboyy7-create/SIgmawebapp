@@ -276,13 +276,16 @@
   }
 
   function refreshMarker() {
-    var profile=null;
-    try { profile=JSON.parse(localStorage.getItem('sigma_profile')); } catch(e){}
+    var profile = null;
+    try { profile = JSON.parse(localStorage.getItem('sigma_profile')); } catch(e) {}
+    /* fallback: build a default profile from the room param */
+    if (!profile && ROOM_ID !== 'default') {
+      profile = { name: 'Guardian', accent: '#55db9c' };
+    }
     var icon = (profile && profile.image) ? buildIcon(profile.image, profile.accent) : buildDefaultIcon();
     if (marker) { marker.setIcon(icon); }
-    // show profile name in status
     if (profile && profile.name) {
-      document.getElementById('dArea').textContent = 'Tracking: '+profile.name;
+      document.getElementById('dArea').textContent = 'Tracking: ' + profile.name;
     }
   }
 
