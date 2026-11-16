@@ -173,3 +173,4 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`SigmaVision server  →  http://localhost:${PORT}`);
   console.log(`Mobile tracker      →  http://localhost:${PORT}/mobile`);
 });
+
