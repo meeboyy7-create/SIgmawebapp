@@ -845,52 +845,9 @@ export default function MarketingPage({ onEnter, user, onLogout }) {
           <BlurText text="SIGMAVISION" animateBy="letters" delay={50} direction="top" stepDuration={0.34}
             key={isAuth ? 'auth' : 'noauth'}
             className="sigma-title"
-            style={{ fontFamily:S.f.disp, fontWeight:900, fontSize:'clamp(80px,16vw,220px)', lineHeight:0.8, letterSpacing:'0.01em', textTransform:'uppercase', color:isAuth?S.paper:S.carbon, justifyContent:'center', whiteSpace:'nowrap' }}/>
+            style={{ fontFamily:S.f.disp, fontWeight:900, fontSize:'clamp(120px,18vw,280px)', lineHeight:0.82, letterSpacing:'-0.01em', textTransform:'uppercase', color:isAuth?S.paper:S.carbon, justifyContent:'center', whiteSpace:'nowrap' }}/>
 
-          {/* ── AUTH VIEW — status badges + welcome ── */}
-          {isAuth && (
-            <motion.div initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} transition={{delay:.4,duration:.55,ease:[.22,1,.36,1]}}
-              style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:14, marginTop:20, pointerEvents:'auto' }}>
-              {/* welcome line */}
-              <p className="dash-label" style={{ fontFamily:S.f.mono, fontWeight:700, fontSize:11, color:S.paper, opacity:.4, letterSpacing:'0.16em', textTransform:'uppercase', margin:0 }}>
-                Dashboard live
-              </p>
-              {/* live status pills — bigger on dark bg */}
-              <div style={{ display:'flex', gap:8, flexWrap:'wrap', justifyContent:'center' }}>
-                <span className="status-pill-wrap"><StatusPill label="Camera" active={!!camUrl} color={S.blue}/></span>
-                <span className="status-pill-wrap"><StatusPill label="GPS"    active={!!pos}    color={S.mint}/></span>
-                <span className="status-pill-wrap"><StatusPill label="System" active             color={S.lavender}/></span>
-              </div>
-              {/* quick actions */}
-              <div style={{ display:'flex', gap:10, flexWrap:'wrap', justifyContent:'center', marginTop:4 }}>
-                <button className="dash-action-btn" onClick={() => setZoomed(true)}
-                  onMouseEnter={e=>e.currentTarget.style.opacity='.8'}
-                  onMouseLeave={e=>e.currentTarget.style.opacity='1'}
-                  style={{fontFamily:S.f.ui,fontWeight:700,fontSize:13,letterSpacing:'0.032em',textTransform:'uppercase',
-                    color:S.carbon,background:S.mint,border:`2px solid ${S.mint}`,borderRadius:9999,
-                    padding:'10px 24px',cursor:'pointer',transition:'opacity .15s',
-                    boxShadow:`3px 3px 0 rgba(85,219,156,0.35)`}}>
-                  Expand Monitor
-                </button>
-                <button className="dash-action-btn" onClick={() => setPanel('setup')}
-                  onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.12)';}}
-                  onMouseLeave={e=>{e.currentTarget.style.background='transparent';}}
-                  style={{fontFamily:S.f.ui,fontWeight:700,fontSize:13,letterSpacing:'0.032em',textTransform:'uppercase',
-                    color:S.paper,background:'transparent',border:`2px solid rgba(255,255,255,0.25)`,borderRadius:9999,
-                    padding:'10px 24px',cursor:'pointer',transition:'background .15s'}}>
-                  Camera Setup
-                </button>
-                <button className="dash-action-btn" onClick={() => setPanel('profile')}
-                  onMouseEnter={e=>{e.currentTarget.style.background='rgba(255,255,255,0.12)';}}
-                  onMouseLeave={e=>{e.currentTarget.style.background='transparent';}}
-                  style={{fontFamily:S.f.ui,fontWeight:700,fontSize:13,letterSpacing:'0.032em',textTransform:'uppercase',
-                    color:S.paper,background:'transparent',border:`2px solid rgba(255,255,255,0.25)`,borderRadius:9999,
-                    padding:'10px 24px',cursor:'pointer',transition:'background .15s'}}>
-                  Choose Profile
-                </button>
-              </div>
-            </motion.div>
-          )}
+          {/* ── AUTH VIEW — nothing shown below SIGMAVISION, nav has Setup/Tutorial/Profile ── */}
 
           {!isAuth && (<>
           <motion.p initial={{opacity:0,y:16}} animate={{opacity:1,y:0}} transition={{delay:.9,duration:.55,ease:[.22,1,.36,1]}}
