@@ -127,7 +127,16 @@ export default function AuthModal({ mode, onModeChange, onSuccess, onClose }) {
     setError(''); setLoading(true);
     try {
       if (mode === 'signin') {
-        await signInWithEmailAndPassword(auth, email, password);
+        const cred = await signInWithEmailAndPassword(auth, email, password);
+        /* reload to get latest emailVerified status */
+        await cred.user.reload();
+        if (!cred.user.emailVerified) {
+          await signOut(auth);
+          setError('Please verify your email first. Check your inbox for the verification link.');
+          /* resend verification */
+          try { await sendEmailVerification(cred.user); } catch {}
+          return;
+        }
         onSuccess();
       } else {
         const cred = await createUserWithEmailAndPassword(auth, email, password);

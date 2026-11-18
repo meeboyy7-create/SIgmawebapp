@@ -40,9 +40,13 @@ export default function App() {
   const prevAuthRef = useRef(null);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
       const wasAuth = prevAuthRef.current;
-      // Only treat as authenticated if email is verified (or provider doesn't require it)
+      if (u) {
+        // Reload to get the latest emailVerified status from Firebase
+        try { await u.reload(); } catch {}
+      }
+      // Only grant access if email is verified
       const isVerified = u && (u.emailVerified || u.providerData?.[0]?.providerId !== 'password');
       const resolvedUser = isVerified ? u : null;
       prevAuthRef.current = !!resolvedUser;
