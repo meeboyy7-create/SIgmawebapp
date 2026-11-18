@@ -1,13 +1,15 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 
+// Keys loaded from environment variables — never hardcoded
+// Set these in Railway → Variables, and in .env.local for local dev
 const firebaseConfig = {
-  apiKey: 'AIzaSyBEchkbvf6sn_Q-Ak0OhIti3RIztanoPOs',
-  authDomain: 'sigmav-a2958.firebaseapp.com',
-  projectId: 'sigmav-a2958',
-  storageBucket: 'sigmav-a2958.appspot.com',
-  messagingSenderId: '191703709876',
-  appId: '1:191703709876:web:569743bc4a50c7d2b77fe1',
+  apiKey:            import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain:        import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId:         import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket:     import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId:             import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
 const app = initializeApp(firebaseConfig);

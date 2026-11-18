@@ -12,10 +12,11 @@ client/node_modules/
 # Server node_modules
 server/node_modules/
 
-# Environment / secrets
+# Environment / secrets — NEVER commit these
 .env
 .env.local
 .env.*.local
+*.env
 
 # OS
 .DS_Store

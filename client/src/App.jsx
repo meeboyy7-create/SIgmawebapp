@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+  import { useState, useEffect, useRef } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './firebase';
 import MarketingPage from './MarketingPage';
@@ -42,12 +42,14 @@ export default function App() {
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       const wasAuth = prevAuthRef.current;
-      prevAuthRef.current = !!u;
-      setUser(u);
+      // Only treat as authenticated if email is verified (or provider doesn't require it)
+      const isVerified = u && (u.emailVerified || u.providerData?.[0]?.providerId !== 'password');
+      const resolvedUser = isVerified ? u : null;
+      prevAuthRef.current = !!resolvedUser;
+      setUser(resolvedUser);
       setAuthLoading(false);
-      if (u) setShowAuth(false);
-      // If transitioning from logged-out → logged-in, replay entrance animation
-      if (!wasAuth && u) {
+      if (resolvedUser) setShowAuth(false);
+      if (!wasAuth && resolvedUser) {
         setEntered(false);
         setTimeout(() => setEntered(true), 60);
       }

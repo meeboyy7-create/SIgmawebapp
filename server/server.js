@@ -21,6 +21,42 @@ const server = http.createServer(app);
 const wss    = new WebSocketServer({ server });
 const PORT   = process.env.PORT || 3000;
 
+/* ── Security headers ──────────────────────────────────────── */
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'geolocation=(self), camera=(self)');
+  next();
+});
+
+/* ── Simple in-memory rate limiter for /location ──────────────
+   Max 60 GPS pings per minute per IP — prevents flooding.
+─────────────────────────────────────────────────────────────── */
+const rateLimits = new Map();
+const RATE_WINDOW = 60 * 1000; // 1 minute
+const RATE_MAX    = 120;        // max requests per window
+
+function rateLimit(req, res, next) {
+  const ip  = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
+  const now = Date.now();
+  const rec = rateLimits.get(ip) || { count: 0, start: now };
+  if (now - rec.start > RATE_WINDOW) { rec.count = 0; rec.start = now; }
+  rec.count++;
+  rateLimits.set(ip, rec);
+  if (rec.count > RATE_MAX) {
+    return res.status(429).json({ error: 'Too many requests' });
+  }
+  next();
+}
+
+// Clean up old rate limit entries every 5 minutes
+setInterval(() => {
+  const cutoff = Date.now() - RATE_WINDOW;
+  rateLimits.forEach((rec, ip) => { if (rec.start < cutoff) rateLimits.delete(ip); });
+}, 5 * 60 * 1000);
+
 /* ── Per-room state  ──────────────────────────────────────────
    rooms[roomId] = {
      location : { lat, lng, accuracy, timestamp } | null,
@@ -55,10 +91,20 @@ function broadcast(roomId, payload) {
 }
 
 // ── Middleware ──────────────────────────────────────────────
-app.use(express.json());
+app.use(express.json({ limit: '10kb' })); // limit body size
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  const allowed = [
+    'https://sigmawebapp-production.up.railway.app',
+    'http://localhost:3000',
+    'http://localhost:5173',
+  ];
+  const origin = req.headers.origin;
+  if (!origin || allowed.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  }
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, ngrok-skip-browser-warning');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
 
@@ -71,7 +117,7 @@ app.get('/mobile', (req, res) => {
 });
 
 // ── POST /location?room=<roomId>  (from mobile page HTTP fallback) ──
-app.post('/location', (req, res) => {
+app.post('/location', rateLimit, (req, res) => {
   const roomId = req.query.room || req.body.room || 'default';
   const { lat, lng, accuracy, timestamp } = req.body;
   if (!lat || !lng) return res.status(400).json({ error: 'Missing lat/lng' });
