@@ -105,9 +105,36 @@ function PfpMarker({ pos, pfpSrc, accent }) {
 }
 
 /* ── MonScreen — pure Slush text style, bold, colorful, no icons ── */
-function MonScreen({ camUrl, pos, activeProfile }) {
+function MonScreen({ camUrl, pos, activeProfile, lastGpsMs }) {
   const [mapVisible, setMapVisible] = useState(false);
+  const [camMs, setCamMs]           = useState(null);
+  const camLoadRef                   = useRef(null);
+
   useEffect(() => { if (pos) { const t = setTimeout(() => setMapVisible(true), 80); return () => clearTimeout(t); } }, [!!pos]);
+
+  /* measure camera frame latency via img load events */
+  const onCamLoad  = () => { if (camLoadRef.current) setCamMs(Date.now() - camLoadRef.current); camLoadRef.current = Date.now(); };
+  const onCamError = () => { camLoadRef.current = Date.now(); };
+
+  /* ms badge helper */
+  const MsBadge = ({ ms, label, color }) => (
+    <div style={{
+      position:'absolute', bottom:5, right:label==='CAM'?'auto':6, left:label==='CAM'?6:'auto',
+      display:'flex', alignItems:'center', gap:4, zIndex:10,
+    }}>
+      {/* label already shown separately — just show ms */}
+      {ms !== null && (
+        <div style={{
+          background:'rgba(0,0,0,0.75)', borderRadius:4, padding:'1px 5px',
+          fontFamily:"'IBM Plex Mono',monospace", fontSize:7, fontWeight:700,
+          color: ms < 100 ? '#55db9c' : ms < 300 ? '#ffd731' : '#fb4903',
+          letterSpacing:'0.08em',
+        }}>
+          {ms}ms
+        </div>
+      )}
+    </div>
+  );
   return (
     <div style={{width:'100%',height:'100%',display:'flex',background:S.carbon}}>
 
@@ -115,12 +142,19 @@ function MonScreen({ camUrl, pos, activeProfile }) {
       <div style={{flex:1,position:'relative',borderRight:`2.5px solid ${S.carbon}`,overflow:'hidden'}}>
         {camUrl ? (
           <>
-            <img src={camUrl} alt="cam" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}/>
+            <img src={camUrl} alt="cam" style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}
+              onLoad={onCamLoad} onError={onCamError}/>
             {/* LIVE badge */}
             <div style={{position:'absolute',top:6,left:6,background:S.ember,border:`2px solid ${S.carbon}`,borderRadius:8,padding:'2px 8px',display:'flex',alignItems:'center',gap:5,boxShadow:`2px 2px 0 ${S.carbon}`}}>
               <div style={{width:5,height:5,borderRadius:'50%',background:'#fff',animation:'mon-dot 1.4s ease-in-out infinite'}}/>
               <span style={{fontFamily:S.f.mono,fontSize:8,color:'#fff',letterSpacing:'0.12em',fontWeight:700}}>LIVE</span>
             </div>
+            {/* camera ms */}
+            {camMs !== null && (
+              <div style={{position:'absolute',top:6,right:6,background:'rgba(0,0,0,0.72)',borderRadius:4,padding:'2px 6px',fontFamily:"'IBM Plex Mono',monospace",fontSize:8,fontWeight:700,letterSpacing:'0.08em',color:camMs<100?'#55db9c':camMs<300?'#ffd731':'#fb4903',zIndex:5}}>
+                {camMs}ms
+              </div>
+            )}
           </>
         ) : (
           /* no signal — bold Slush text layout */
@@ -176,9 +210,16 @@ function MonScreen({ camUrl, pos, activeProfile }) {
             <div style={{height:3,borderRadius:99,background:'rgba(0,0,0,0.18)'}}/>
           </div>
         )}
-        {/* GPS label */}
-        <div style={{position:'absolute',bottom:5,right:6,zIndex:999,background:S.carbon,borderRadius:5,padding:'1px 6px'}}>
-          <span style={{fontFamily:S.f.mono,fontSize:7,color:'#fff',letterSpacing:'0.12em',textTransform:'uppercase'}}>GPS</span>
+        {/* GPS label + ms */}
+        <div style={{position:'absolute',bottom:5,right:6,zIndex:999,display:'flex',alignItems:'center',gap:4}}>
+          {lastGpsMs !== null && lastGpsMs !== undefined && (
+            <div style={{background:'rgba(0,0,0,0.72)',borderRadius:4,padding:'2px 6px',fontFamily:"'IBM Plex Mono',monospace",fontSize:8,fontWeight:700,letterSpacing:'0.08em',color:lastGpsMs<500?'#55db9c':lastGpsMs<2000?'#ffd731':'#fb4903'}}>
+              {lastGpsMs < 1000 ? `${lastGpsMs}ms` : `${(lastGpsMs/1000).toFixed(1)}s ago`}
+            </div>
+          )}
+          <div style={{background:S.carbon,borderRadius:5,padding:'1px 6px'}}>
+            <span style={{fontFamily:S.f.mono,fontSize:7,color:'#fff',letterSpacing:'0.12em',textTransform:'uppercase'}}>GPS</span>
+          </div>
         </div>
       </div>
     </div>
@@ -186,7 +227,7 @@ function MonScreen({ camUrl, pos, activeProfile }) {
 }
 
 /* ── Monitor + Table ── */
-function Monitor({ tableRef, monRef, isAuth, camUrl, pos, onZoom, activeProfile, monitorReady }) {
+function Monitor({ tableRef, monRef, isAuth, camUrl, pos, onZoom, activeProfile, monitorReady, lastGpsMs }) {
   return (
     <>
       {/* TABLE */}
@@ -227,7 +268,7 @@ function Monitor({ tableRef, monRef, isAuth, camUrl, pos, onZoom, activeProfile,
             cursor:'zoom-in',
             zIndex:1,
           }} onClick={e=>{e.stopPropagation();onZoom();}}>
-            <MonScreen camUrl={camUrl} pos={pos} activeProfile={activeProfile}/>
+            <MonScreen camUrl={camUrl} pos={pos} activeProfile={activeProfile} lastGpsMs={lastGpsMs}/>
             <div style={{position:'absolute',bottom:7,left:'50%',transform:'translateX(-50%)',background:'rgba(0,0,0,0.7)',borderRadius:8,padding:'3px 10px',display:'flex',alignItems:'center',gap:5,pointerEvents:'none'}}>
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
               <span style={{fontFamily:S.f.mono,fontSize:7,color:'#fff',letterSpacing:'0.12em',textTransform:'uppercase'}}>Click to expand</span>
@@ -606,7 +647,9 @@ export default function MarketingPage({ onEnter, user, onLogout }) {
   const [zoomed,       setZoomed]       = useState(false);
   const [panel,        setPanel]        = useState(null);
   const [activeSection,setActiveSection]= useState('');
-  const [monitorReady, setMonitorReady] = useState(false); /* fires when monitor faces user */
+  const [monitorReady, setMonitorReady] = useState(false);
+  const [lastGpsMs,    setLastGpsMs]    = useState(null);
+  const lastGpsTsRef = useRef(null); /* fires when monitor faces user */
   const [locHistory,   setLocHistory]   = useState([]);
   const [activeProfile,setActiveProfile]= useState(null);   // selected card
   const [displayName,  setDisplayName]  = useState('');
@@ -669,6 +712,10 @@ export default function MarketingPage({ onEnter, user, onLogout }) {
             const lng = d.longitude ?? d.lng;
             if (lat && lng) {
               const p = [lat, lng];
+              /* measure GPS latency — time since last update */
+              const tsNow = Date.now();
+              if (lastGpsTsRef.current) setLastGpsMs(tsNow - lastGpsTsRef.current);
+              lastGpsTsRef.current = tsNow;
               setPos(p);
               const last = lastPos.current;
               const dist = last ? Math.sqrt((p[0]-last[0])**2+(p[1]-last[1])**2)*111000 : 999;
@@ -871,7 +918,7 @@ export default function MarketingPage({ onEnter, user, onLogout }) {
           </>)}
         </div>
 
-        <Monitor tableRef={tableRef} monRef={monRef} isAuth={isAuth} camUrl={camUrl} pos={pos} onZoom={() => setZoomed(true)} activeProfile={activeProfile} monitorReady={monitorReady}/>
+        <Monitor tableRef={tableRef} monRef={monRef} isAuth={isAuth} camUrl={camUrl} pos={pos} onZoom={() => setZoomed(true)} activeProfile={activeProfile} monitorReady={monitorReady} lastGpsMs={lastGpsMs}/>
 
         <div ref={scrollHintRef} style={{ position:'absolute', bottom:28, left:'50%', transform:'translateX(-50%)', zIndex:10, display:'flex', flexDirection:'column', alignItems:'center', gap:5 }}>
           <div style={{ width:1, height:36, background:'linear-gradient(to bottom,transparent,rgba(0,0,0,0.3))' }}/>
@@ -895,7 +942,7 @@ export default function MarketingPage({ onEnter, user, onLogout }) {
             border:`3px solid ${S.carbon}`,
             boxShadow:'0 40px 100px rgba(0,0,0,0.8)',
           }}>
-            <MonScreen camUrl={camUrl} pos={pos} activeProfile={activeProfile}/>
+            <MonScreen camUrl={camUrl} pos={pos} activeProfile={activeProfile} lastGpsMs={lastGpsMs}/>
             <button onClick={() => setZoomed(false)} aria-label="Close monitor" style={{ position:'absolute', top:14, right:14, width:40, height:40, borderRadius:9999, background:S.carbon, border:`2px solid ${S.paper}`, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', zIndex:10 }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={S.paper} strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
