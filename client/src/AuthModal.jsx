@@ -26,35 +26,70 @@ function friendlyError(code) {
     case 'auth/weak-password': return 'Password needs at least 6 characters.';
     case 'auth/invalid-email': return 'Enter a valid email address.';
     case 'auth/too-many-requests': return 'Too many attempts — try again later.';
+    case 'auth/network-request-failed': return 'Network error. Check your connection.';
     default: return 'Something went wrong. Please try again.';
   }
 }
 
-/* ── Shared input ── */
-function Field({ label, type, value, onChange, placeholder, autoComplete }) {
-  const [focused, setFocused] = useState(false);
+/* ── Strict client-side validation ── */
+const EMAIL_RE = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+function validateInputs(email, password, mode) {
+  const e = email.trim();
+  if (!e) return 'Email is required.';
+  if (!EMAIL_RE.test(e)) return 'Enter a valid email address (e.g. you@example.com).';
+  if (e.length > 254) return 'Email address is too long.';
+  if (!password) return 'Password is required.';
+  if (password.length < 6) return 'Password must be at least 6 characters.';
+  if (password.length > 128) return 'Password is too long.';
+  if (mode === 'signup') {
+    if (/\s/.test(password)) return 'Password cannot contain spaces.';
+  }
+  return null; // valid
+}
+
+/* ── Shared input with inline validation ── */
+function Field({ label, type, value, onChange, placeholder, autoComplete, validate }) {
+  const [focused,  setFocused]  = useState(false);
+  const [touched,  setTouched]  = useState(false);
+  const [inlineErr,setInlineErr]= useState('');
+
+  const check = (val) => {
+    if (!validate) return;
+    const err = validate(val);
+    setInlineErr(err || '');
+  };
+
+  const hasErr = touched && inlineErr;
+
   return (
     <div>
       <label style={{
         display:'block', fontFamily:S.fM, fontSize:10,
         fontWeight:700, letterSpacing:'0.14em', textTransform:'uppercase',
-        color:S.carbon, opacity:.5, marginBottom:8,
+        color: hasErr ? S.ember : S.carbon, opacity: hasErr ? 1 : .5, marginBottom:8,
+        transition:'color .15s',
       }}>{label}</label>
       <input
         type={type} required autoComplete={autoComplete}
-        value={value} onChange={e=>onChange(e.target.value)}
+        value={value}
+        onChange={e => { onChange(e.target.value); if (touched) check(e.target.value); }}
+        onFocus={() => setFocused(true)}
+        onBlur={() => { setFocused(false); setTouched(true); check(value); }}
         placeholder={placeholder}
-        onFocus={()=>setFocused(true)}
-        onBlur={()=>setFocused(false)}
         style={{
           width:'100%', padding:'13px 16px', borderRadius:6,
-          border:`2px solid ${focused?S.carbon:'rgba(0,0,0,0.15)'}`,
-          background:focused?S.paper:S.sky,
+          border:`2px solid ${hasErr ? S.ember : focused ? S.carbon : 'rgba(0,0,0,0.15)'}`,
+          background: hasErr ? '#fff5f5' : focused ? S.paper : S.sky,
           fontFamily:S.fU, fontSize:15, color:S.carbon,
           boxSizing:'border-box',
           transition:'border-color .15s, background .15s',
         }}
       />
+      {hasErr && (
+        <div style={{ fontFamily:S.fM, fontSize:10, color:S.ember, marginTop:5, letterSpacing:'0.04em' }}>
+          {inlineErr}
+        </div>
+      )}
     </div>
   );
 }
@@ -124,22 +159,27 @@ export default function AuthModal({ mode, onModeChange, onSuccess, onClose }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError(''); setLoading(true);
+    setError('');
+
+    /* ── Strict client-side validation first — no Firebase hit if invalid ── */
+    const validationError = validateInputs(email, password, mode);
+    if (validationError) { setError(validationError); return; }
+
+    setLoading(true);
     try {
       if (mode === 'signin') {
-        const cred = await signInWithEmailAndPassword(auth, email, password);
+        const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
         /* reload to get latest emailVerified status */
         await cred.user.reload();
         if (!cred.user.emailVerified) {
           await signOut(auth);
           setError('Please verify your email first. Check your inbox for the verification link.');
-          /* resend verification */
           try { await sendEmailVerification(cred.user); } catch {}
           return;
         }
         onSuccess();
       } else {
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
         await sendEmailVerification(cred.user);
         await signOut(auth);
         setSent(true);
@@ -225,10 +265,21 @@ export default function AuthModal({ mode, onModeChange, onSuccess, onClose }) {
             <div style={{padding:'24px 28px 28px'}}>
               <form onSubmit={handleSubmit} style={{display:'flex',flexDirection:'column',gap:16}}>
                 <Field label="Email"    type="email"    value={email}    onChange={setEmail}
-                  placeholder="you@example.com" autoComplete="email"/>
+                  placeholder="you@example.com" autoComplete="email"
+                  validate={v => {
+                    if (!v.trim()) return 'Email is required.';
+                    if (!EMAIL_RE.test(v.trim())) return 'Enter a valid email (e.g. you@example.com).';
+                    return null;
+                  }}/>
                 <Field label="Password" type="password" value={password} onChange={setPassword}
                   placeholder={mode==='signin'?'Your password':'Min. 6 characters'}
-                  autoComplete={mode==='signin'?'current-password':'new-password'}/>
+                  autoComplete={mode==='signin'?'current-password':'new-password'}
+                  validate={v => {
+                    if (!v) return 'Password is required.';
+                    if (v.length < 6) return 'At least 6 characters.';
+                    if (mode === 'signup' && /\s/.test(v)) return 'No spaces allowed.';
+                    return null;
+                  }}/>
 
                 {error && <ErrorPill msg={error}/>}
 
