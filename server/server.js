@@ -6,8 +6,9 @@
  *   - Dashboard WS sends  { type:'join',  roomId }  on connect.
  *   - Mobile page sends   { type:'gps',   roomId, lat, lng, ... }  or
  *                         POST /location?room=<roomId>
- *   - Server routes GPS only to WS clients in the same room.
- *   - Camera IP is also stored per-room.
+ *   - ESP32-CAM sends     { type:'cam',   roomId }  to register, then
+ *                         binary WebSocket frames (raw JPEG bytes).
+ *   - Server routes GPS and camera frames only to WS clients in the same room.
  *
  * Zero cross-user data leakage.
  */
@@ -31,12 +32,10 @@ app.use((req, res, next) => {
   next();
 });
 
-/* ── Simple in-memory rate limiter for /location ──────────────
-   Max 60 GPS pings per minute per IP — prevents flooding.
-─────────────────────────────────────────────────────────────── */
+/* ── Rate limiter ──────────────────────────────────────────── */
 const rateLimits = new Map();
-const RATE_WINDOW = 60 * 1000; // 1 minute
-const RATE_MAX    = 120;        // max requests per window
+const RATE_WINDOW = 60 * 1000;
+const RATE_MAX    = 120;
 
 function rateLimit(req, res, next) {
   const ip  = req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress;
@@ -45,25 +44,16 @@ function rateLimit(req, res, next) {
   if (now - rec.start > RATE_WINDOW) { rec.count = 0; rec.start = now; }
   rec.count++;
   rateLimits.set(ip, rec);
-  if (rec.count > RATE_MAX) {
-    return res.status(429).json({ error: 'Too many requests' });
-  }
+  if (rec.count > RATE_MAX) return res.status(429).json({ error: 'Too many requests' });
   next();
 }
 
-// Clean up old rate limit entries every 5 minutes
 setInterval(() => {
   const cutoff = Date.now() - RATE_WINDOW;
   rateLimits.forEach((rec, ip) => { if (rec.start < cutoff) rateLimits.delete(ip); });
 }, 5 * 60 * 1000);
 
-/* ── Per-room state  ──────────────────────────────────────────
-   rooms[roomId] = {
-     location : { lat, lng, accuracy, timestamp } | null,
-     camIp    : string | null,
-     clients  : Set<WebSocket>,
-   }
-─────────────────────────────────────────────────────────────── */
+/* ── Per-room state ────────────────────────────────────────── */
 const rooms = new Map();
 
 function getRoom(roomId) {
@@ -90,11 +80,12 @@ function broadcast(roomId, payload) {
   });
 }
 
-// ── Middleware ──────────────────────────────────────────────
-app.use(express.json({ limit: '10kb' })); // limit body size
+/* ── Middleware ────────────────────────────────────────────── */
+app.use(express.json({ limit: '10kb' }));
 app.use((req, res, next) => {
   const allowed = [
     'https://sigmawebapp-production.up.railway.app',
+    'https://hopeful-ambition-production-82bb042a.up.railway.app',
     'http://localhost:3000',
     'http://localhost:5173',
   ];
@@ -108,15 +99,15 @@ app.use((req, res, next) => {
   next();
 });
 
-// ── Static React build ──────────────────────────────────────
+/* ── Static React build ──────────────────────────────────── */
 app.use(express.static(path.join(__dirname, '..', 'client', 'dist')));
 
-// ── Mobile GPS tracker page ─────────────────────────────────
+/* ── Mobile GPS tracker page ─────────────────────────────── */
 app.get('/mobile', (req, res) => {
   res.sendFile(path.join(__dirname, '..', 'mobile.html'));
 });
 
-// ── POST /location?room=<roomId>  (from mobile page HTTP fallback) ──
+/* ── POST /location ──────────────────────────────────────── */
 app.post('/location', rateLimit, (req, res) => {
   const roomId = req.query.room || req.body.room || 'default';
   const { lat, lng, accuracy, timestamp } = req.body;
@@ -125,11 +116,8 @@ app.post('/location', rateLimit, (req, res) => {
   const loc = { lat, lng, accuracy, timestamp: timestamp || Date.now() };
   getRoom(roomId).location = loc;
   console.log(`[GPS] room=${roomId}  ${lat},${lng}`);
-
-  // broadcast to the specific room
   broadcast(roomId, { type: 'location', ...loc });
 
-  // also broadcast to ALL rooms with dashboard clients as fallback
   rooms.forEach((room, rId) => {
     if (rId !== roomId && room.clients.size > 0) {
       broadcast(rId, { type: 'location', ...loc });
@@ -139,14 +127,14 @@ app.post('/location', rateLimit, (req, res) => {
   res.json({ ok: true });
 });
 
-// ── GET /get_data?room=<roomId>  (polling fallback) ───────────
+/* ── GET /get_data ───────────────────────────────────────── */
 app.get('/get_data', (req, res) => {
   const roomId = req.query.room || 'default';
   const room   = rooms.get(roomId);
   res.json(room?.location || {});
 });
 
-// ── Camera IP — per room ────────────────────────────────────
+/* ── Camera IP endpoints (kept for legacy) ───────────────── */
 app.get('/camip', (req, res) => {
   const roomId = req.query.room || 'default';
   const room   = rooms.get(roomId);
@@ -161,60 +149,78 @@ app.post('/camip', (req, res) => {
   res.json({ ok: true, ip });
 });
 
-// ── WebSocket ───────────────────────────────────────────────
+/* ── WebSocket ───────────────────────────────────────────── */
 wss.on('connection', (ws, req) => {
   console.log('[WS] connected:', req.socket.remoteAddress);
   let roomId = null;
+  let isCam  = false;
 
-  ws.on('message', (raw) => {
+  ws.on('message', (raw, isBinary) => {
+
+    // ── Binary = JPEG frame from ESP32-CAM ──────────────
+    if (isBinary || Buffer.isBuffer(raw)) {
+      if (!roomId) return; // cam must register first
+      const room = rooms.get(roomId);
+      if (!room) return;
+      // Relay raw JPEG to all dashboard clients in this room
+      room.clients.forEach(client => {
+        if (client !== ws && client.readyState === 1) {
+          client.send(raw, { binary: true });
+        }
+      });
+      return;
+    }
+
+    // ── Text = JSON control message ──────────────────────
     let data;
     try { data = JSON.parse(raw); } catch { return; }
 
-    // ── Dashboard joins a room ──
+    // ── ESP32-CAM registers its room ─────────────────────
+    if (data.type === 'cam' && data.roomId) {
+      roomId = data.roomId;
+      isCam  = true;
+      getRoom(roomId); // ensure room exists
+      console.log(`[WS CAM] registered room=${roomId}`);
+      ws.send(JSON.stringify({ type: 'cam_ack', ok: true }));
+      return;
+    }
+
+    // ── Dashboard joins a room ───────────────────────────
     if (data.type === 'join' && data.roomId) {
-      // leave old room if re-joining
       if (roomId && rooms.has(roomId)) {
         rooms.get(roomId).clients.delete(ws);
         cleanRoom(roomId);
       }
       roomId = data.roomId;
+      isCam  = false;
       getRoom(roomId).clients.add(ws);
       console.log(`[WS] join room=${roomId}  size=${rooms.get(roomId).clients.size}`);
 
-      // send current state to this client
       const room = rooms.get(roomId);
       if (room.location) ws.send(JSON.stringify({ type: 'location', ...room.location }));
       return;
     }
 
-    // ── Mobile sends GPS ──
-    if ((data.type === 'gps' || (data.lat && data.lng))) {
+    // ── Mobile sends GPS ─────────────────────────────────
+    if (data.type === 'gps' || (data.lat && data.lng)) {
       const rid = data.roomId || roomId || 'default';
       const loc = { lat: data.lat, lng: data.lng, accuracy: data.accuracy, timestamp: data.timestamp || Date.now() };
       getRoom(rid).location = loc;
       console.log(`[WS GPS] room=${rid}  ${loc.lat},${loc.lng}`);
 
-      // broadcast to that room
       broadcast(rid, { type: 'location', ...loc });
-
-      // ALSO broadcast to 'default' room clients as fallback
-      if (rid !== 'default') {
-        broadcast('default', { type: 'location', ...loc });
-      }
-
-      // ALSO broadcast to ALL other rooms that have clients (single-user fallback)
+      if (rid !== 'default') broadcast('default', { type: 'location', ...loc });
       rooms.forEach((room, rId) => {
         if (rId !== rid && rId !== 'default' && room.clients.size > 0) {
           broadcast(rId, { type: 'location', ...loc });
         }
       });
-      return;
     }
   });
 
   ws.on('close', () => {
     if (roomId && rooms.has(roomId)) {
-      rooms.get(roomId).clients.delete(ws);
+      if (!isCam) rooms.get(roomId).clients.delete(ws);
       cleanRoom(roomId);
     }
     console.log('[WS] disconnected');
@@ -223,16 +229,15 @@ wss.on('connection', (ws, req) => {
   ws.on('error', () => ws.terminate());
 });
 
-// ── SPA fallback ────────────────────────────────────────────
+/* ── SPA fallback ────────────────────────────────────────── */
 app.use((req, res, next) => {
   const api = ['/location', '/get_data', '/camip', '/mobile'];
   if (api.some(p => req.path.startsWith(p))) return next();
   res.sendFile(path.join(__dirname, '..', 'client', 'dist', 'index.html'));
 });
 
-// ── Start ───────────────────────────────────────────────────
+/* ── Start ───────────────────────────────────────────────── */
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`SigmaVision server  →  http://localhost:${PORT}`);
   console.log(`Mobile tracker      →  http://localhost:${PORT}/mobile`);
 });
-

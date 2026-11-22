@@ -10,6 +10,7 @@ import BlurText from './components/BlurText';
 import CrowdCanvas from './components/CrowdCanvas';
 import MonitorSplash from './components/MonitorSplash';
 import DashboardAnimator from './components/DashboardAnimator';
+import HowItWorks from './components/HowItWorks';
 import { gsap } from 'gsap';
 import { SplitText } from 'gsap/SplitText';
 import { CustomEase } from 'gsap/CustomEase';
@@ -268,7 +269,7 @@ function Monitor({ tableRef, monRef, isAuth, camUrl, pos, onZoom, activeProfile,
             cursor:'zoom-in',
             zIndex:1,
           }} onClick={e=>{e.stopPropagation();onZoom();}}>
-            <MonScreen camUrl={camUrl} pos={pos} activeProfile={activeProfile} lastGpsMs={lastGpsMs}/>
+            <MonScreen camUrl={camFrame} pos={pos} activeProfile={activeProfile} lastGpsMs={lastGpsMs}/>
             <div style={{position:'absolute',bottom:7,left:'50%',transform:'translateX(-50%)',background:'rgba(0,0,0,0.7)',borderRadius:8,padding:'3px 10px',display:'flex',alignItems:'center',gap:5,pointerEvents:'none'}}>
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
               <span style={{fontFamily:S.f.mono,fontSize:7,color:'#fff',letterSpacing:'0.12em',textTransform:'uppercase'}}>Click to expand</span>
@@ -649,7 +650,10 @@ export default function MarketingPage({ onEnter, user, onLogout }) {
   const [activeSection,setActiveSection]= useState('');
   const [monitorReady, setMonitorReady] = useState(false);
   const [lastGpsMs,    setLastGpsMs]    = useState(null);
-  const lastGpsTsRef = useRef(null); /* fires when monitor faces user */
+  const lastGpsTsRef = useRef(null);
+  const [camFrame,     setCamFrame]     = useState(null);  // blob URL from WS binary frames
+  const camFrameRef = useRef(null);
+  const [showHowItWorks, setShowHowItWorks] = useState(false); /* fires when monitor faces user */
   const [locHistory,   setLocHistory]   = useState([]);
   const [activeProfile,setActiveProfile]= useState(null);   // selected card
   const [displayName,  setDisplayName]  = useState('');
@@ -699,6 +703,7 @@ export default function MarketingPage({ onEnter, user, onLogout }) {
         const host  = window.location.host;
         const wsUrl = `${proto}://${host}`;
         const ws = new WebSocket(wsUrl);
+        ws.binaryType = 'blob';
         wsRef.current = ws;
         ws.onopen = () => {
           ws.send(JSON.stringify({ type: 'join', roomId }));
@@ -706,6 +711,18 @@ export default function MarketingPage({ onEnter, user, onLogout }) {
         ws.onclose = () => { if (alive) setTimeout(connect, ms); ms = Math.min(ms * 1.5, 30000); };
         ws.onerror = () => ws.close();
         ws.onmessage = async (e) => {
+          // Binary = JPEG frame from ESP32-CAM via relay
+          if (e.data instanceof Blob) {
+            const url = URL.createObjectURL(e.data);
+            setCamFrame(prev => { if (prev) URL.revokeObjectURL(prev); return url; });
+            return;
+          }
+          if (e.data instanceof ArrayBuffer) {
+            const blob = new Blob([e.data], { type: 'image/jpeg' });
+            const url = URL.createObjectURL(blob);
+            setCamFrame(prev => { if (prev) URL.revokeObjectURL(prev); return url; });
+            return;
+          }
           try {
             const d = JSON.parse(e.data);
             const lat = d.latitude ?? d.lat;
@@ -942,7 +959,7 @@ export default function MarketingPage({ onEnter, user, onLogout }) {
             border:`3px solid ${S.carbon}`,
             boxShadow:'0 40px 100px rgba(0,0,0,0.8)',
           }}>
-            <MonScreen camUrl={camUrl} pos={pos} activeProfile={activeProfile} lastGpsMs={lastGpsMs}/>
+            <MonScreen camUrl={camFrame} pos={pos} activeProfile={activeProfile} lastGpsMs={lastGpsMs}/>
             <button onClick={() => setZoomed(false)} aria-label="Close monitor" style={{ position:'absolute', top:14, right:14, width:40, height:40, borderRadius:9999, background:S.carbon, border:`2px solid ${S.paper}`, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', zIndex:10 }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={S.paper} strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
