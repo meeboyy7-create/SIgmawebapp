@@ -305,7 +305,7 @@ bool initCamera() {
   cfg.pixel_format = PIXFORMAT_JPEG;
   cfg.frame_size   = FRAMESIZE_VGA;   // 640×480
   cfg.jpeg_quality = 15;              // 0=best, 63=worst
-  cfg.fb_count     = 1;
+  cfg.fb_count     = 2;               // double buffer — prevents FB-OVF
 
   esp_err_t err = esp_camera_init(&cfg);
   if (err != ESP_OK) {
@@ -458,9 +458,9 @@ void loop() {
   // Not registered yet — wait
   if (!g_registered) return;
 
-  // Frame rate cap — target ~15 fps (66ms between frames)
+  // Frame rate cap — target ~10 fps (100ms) — gives WS time to flush
   uint32_t now = millis();
-  if (now - lastFrameMs < 66) return;
+  if (now - lastFrameMs < 100) return;
   lastFrameMs = now;
 
   // Grab JPEG frame from camera
@@ -471,9 +471,21 @@ void loop() {
     return;
   }
 
+  // Copy frame data then return buffer immediately — prevents FB-OVF
+  size_t len = fb->len;
+  uint8_t* buf = (uint8_t*)malloc(len);
+  if (!buf) {
+    esp_camera_fb_return(fb);
+    Serial.println("[CAM] malloc failed — skipping frame");
+    delay(10);
+    return;
+  }
+  memcpy(buf, fb->buf, len);
+  esp_camera_fb_return(fb);  // return buffer NOW before slow WS send
+
   // Send binary JPEG over WebSocket
-  bool ok = ws.sendBIN(fb->buf, fb->len);
-  esp_camera_fb_return(fb);
+  bool ok = ws.sendBIN(buf, len);
+  free(buf);
 
   if (!ok) {
     Serial.println("[WS] sendBIN failed — WebSocket may have dropped");
