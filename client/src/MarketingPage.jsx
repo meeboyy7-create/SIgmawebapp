@@ -228,7 +228,7 @@ function MonScreen({ camUrl, pos, activeProfile, lastGpsMs }) {
 }
 
 /* ── Monitor + Table ── */
-function Monitor({ tableRef, monRef, isAuth, camUrl, pos, onZoom, activeProfile, monitorReady, lastGpsMs }) {
+function Monitor({ tableRef, monRef, isAuth, camUrl, camFrame, pos, onZoom, activeProfile, monitorReady, lastGpsMs }) {
   return (
     <>
       {/* TABLE */}
@@ -269,7 +269,7 @@ function Monitor({ tableRef, monRef, isAuth, camUrl, pos, onZoom, activeProfile,
             cursor:'zoom-in',
             zIndex:1,
           }} onClick={e=>{e.stopPropagation();onZoom();}}>
-            <MonScreen camUrl={camFrame} pos={pos} activeProfile={activeProfile} lastGpsMs={lastGpsMs}/>
+            <MonScreen camUrl={camFrame || camUrl} pos={pos} activeProfile={activeProfile} lastGpsMs={lastGpsMs}/>
             <div style={{position:'absolute',bottom:7,left:'50%',transform:'translateX(-50%)',background:'rgba(0,0,0,0.7)',borderRadius:8,padding:'3px 10px',display:'flex',alignItems:'center',gap:5,pointerEvents:'none'}}>
               <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
               <span style={{fontFamily:S.f.mono,fontSize:7,color:'#fff',letterSpacing:'0.12em',textTransform:'uppercase'}}>Click to expand</span>
@@ -935,7 +935,7 @@ export default function MarketingPage({ onEnter, user, onLogout }) {
           </>)}
         </div>
 
-        <Monitor tableRef={tableRef} monRef={monRef} isAuth={isAuth} camUrl={camUrl} pos={pos} onZoom={() => setZoomed(true)} activeProfile={activeProfile} monitorReady={monitorReady} lastGpsMs={lastGpsMs}/>
+        <Monitor tableRef={tableRef} monRef={monRef} isAuth={isAuth} camUrl={camUrl} camFrame={camFrame} pos={pos} onZoom={() => setZoomed(true)} activeProfile={activeProfile} monitorReady={monitorReady} lastGpsMs={lastGpsMs}/>
 
         <div ref={scrollHintRef} style={{ position:'absolute', bottom:28, left:'50%', transform:'translateX(-50%)', zIndex:10, display:'flex', flexDirection:'column', alignItems:'center', gap:5 }}>
           <div style={{ width:1, height:36, background:'linear-gradient(to bottom,transparent,rgba(0,0,0,0.3))' }}/>
@@ -959,7 +959,7 @@ export default function MarketingPage({ onEnter, user, onLogout }) {
             border:`3px solid ${S.carbon}`,
             boxShadow:'0 40px 100px rgba(0,0,0,0.8)',
           }}>
-            <MonScreen camUrl={camFrame} pos={pos} activeProfile={activeProfile} lastGpsMs={lastGpsMs}/>
+            <MonScreen camUrl={camFrame || camUrl} pos={pos} activeProfile={activeProfile} lastGpsMs={lastGpsMs}/>
             <button onClick={() => setZoomed(false)} aria-label="Close monitor" style={{ position:'absolute', top:14, right:14, width:40, height:40, borderRadius:9999, background:S.carbon, border:`2px solid ${S.paper}`, display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', zIndex:10 }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={S.paper} strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
             </button>
