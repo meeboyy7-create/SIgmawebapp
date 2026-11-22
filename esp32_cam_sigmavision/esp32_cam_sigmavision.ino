@@ -142,59 +142,37 @@ const char SETUP_HTML[] PROGMEM = R"rawhtml(
         border:1.5px solid rgba(255,255,255,0.1);
         background:rgba(255,255,255,0.05);
         color:#fff;font-size:14px;outline:none;
-        transition:border-color .2s;margin-bottom:16px}
-  input:focus{border-color:rgba(255,255,255,0.4)}
+        margin-bottom:16px;-webkit-appearance:none}
   .hint{font-size:11px;color:rgba(255,255,255,0.3);
         margin-top:-12px;margin-bottom:16px;line-height:1.5}
   button{width:100%;padding:14px;border-radius:10px;
          border:none;background:#fff;color:#0b0d0d;
          font-weight:800;font-size:15px;cursor:pointer;
-         letter-spacing:-0.01em;transition:opacity .2s}
-  button:active{opacity:.8}
-  .ok{display:none;background:#55db9c;color:#0b0d0d;
-      border-radius:10px;padding:14px;text-align:center;
-      font-weight:700;font-size:14px;margin-top:12px}
+         -webkit-appearance:none;margin-top:4px}
 </style>
 </head>
 <body>
 <div class="card">
   <div class="logo">&#9671; SigmaVision</div>
   <div class="sub">Camera Setup — connect once, stream forever</div>
-  <form id="f" onsubmit="submit(event)">
+  <form method="POST" action="/save">
     <label>WiFi Network Name (SSID)</label>
-    <input name="ssid" type="text" placeholder="YourWiFiName" required autocomplete="off" autocorrect="off" autocapitalize="none">
+    <input name="ssid" type="text" placeholder="YourWiFiName" required
+           autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
 
     <label>WiFi Password</label>
-    <input name="pass" type="password" placeholder="••••••••" autocomplete="off">
+    <input name="pass" type="password" placeholder="Leave blank if open network"
+           autocomplete="off">
     <div class="hint">Leave blank if the network has no password</div>
 
     <label>Room ID</label>
-    <input name="room" type="text" placeholder="Paste your Room ID here" required autocomplete="off" autocorrect="off" autocapitalize="none">
-    <div class="hint">Open SigmaVision app &rarr; Dashboard &rarr; tap <b>Copy Room ID</b></div>
+    <input name="room" type="text" placeholder="Paste your Room ID here" required
+           autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false">
+    <div class="hint">SigmaVision app &rarr; Setup panel &rarr; Copy Room ID</div>
 
-    <button type="submit" id="btn">Save &amp; Connect</button>
-    <div class="ok" id="ok">&#10003; Saved! Camera is rebooting&hellip;</div>
+    <button type="submit">Save &amp; Connect &#8594;</button>
   </form>
 </div>
-<script>
-function submit(e){
-  e.preventDefault();
-  var d=new FormData(e.target);
-  document.getElementById('btn').disabled=true;
-  document.getElementById('btn').textContent='Saving\u2026';
-  fetch('/save',{method:'POST',
-    headers:{'Content-Type':'application/x-www-form-urlencoded'},
-    body:new URLSearchParams(d).toString()})
-  .then(r=>r.text()).then(()=>{
-    document.getElementById('ok').style.display='block';
-    document.getElementById('btn').style.display='none';
-  }).catch(()=>{
-    document.getElementById('btn').disabled=false;
-    document.getElementById('btn').textContent='Save & Connect';
-    alert('Error saving. Try again.');
-  });
-}
-</script>
 </body>
 </html>
 )rawhtml";
@@ -227,7 +205,22 @@ void handleSave() {
   }
 
   saveCreds(ssid.c_str(), pass.c_str(), room.c_str());
-  httpServer.send(200, "text/plain", "OK");
+
+  // Send success page — plain HTML, no JS needed
+  httpServer.send(200, "text/html",
+    "<html><head><meta charset='UTF-8'>"
+    "<style>body{background:#0b0d0d;color:#fff;font-family:sans-serif;"
+    "display:flex;align-items:center;justify-content:center;height:100vh;margin:0;text-align:center}"
+    ".ok{background:#151918;border-radius:20px;padding:32px 28px;max-width:340px}"
+    ".check{font-size:48px;margin-bottom:16px}"
+    "h2{font-size:22px;font-weight:800;margin:0 0 10px}"
+    "p{color:rgba(255,255,255,0.45);font-size:14px;margin:0}</style></head>"
+    "<body><div class='ok'>"
+    "<div class='check'>&#10003;</div>"
+    "<h2>Saved!</h2>"
+    "<p>Camera is rebooting and will connect to your WiFi. You can close this page.</p>"
+    "</div></body></html>"
+  );
 
   Serial.println("[HTTP] Credentials saved — rebooting in 2s...");
   delay(2000);
