@@ -297,8 +297,8 @@ bool initCamera() {
   cfg.pin_pclk    = PCLK_GPIO_NUM;
   cfg.pin_vsync   = VSYNC_GPIO_NUM;
   cfg.pin_href    = HREF_GPIO_NUM;
-  cfg.pin_sda     = SIOD_GPIO_NUM;
-  cfg.pin_scl     = SIOC_GPIO_NUM;
+  cfg.pin_sccb_sda = SIOD_GPIO_NUM;
+  cfg.pin_sccb_scl = SIOC_GPIO_NUM;
   cfg.pin_pwdn    = PWDN_GPIO_NUM;
   cfg.pin_reset   = RESET_GPIO_NUM;
   cfg.xclk_freq_hz = 20000000;
@@ -484,8 +484,8 @@ void loop() {
 
   // Print stats every 10 seconds
   if (now - lastStatsMs >= 10000) {
-    Serial.printf("[STREAM] %u frames sent in last 10s  (~%u fps)  heap=%u\n",
-      frameCount, frameCount / 10, ESP.getFreeHeap());
+    Serial.printf("[STREAM] %lu frames sent in last 10s  (~%lu fps)  heap=%lu\n",
+      (unsigned long)frameCount, (unsigned long)(frameCount / 10), (unsigned long)ESP.getFreeHeap());
     frameCount   = 0;
     lastStatsMs  = now;
   }
