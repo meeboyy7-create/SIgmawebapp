@@ -127,7 +127,14 @@ app.post('/location', rateLimit, (req, res) => {
   res.json({ ok: true });
 });
 
-/* ── GET /get_data ───────────────────────────────────────── */
+/* ── Debug: show active rooms ──────────────────────────── */
+app.get('/debug', (req, res) => {
+  const info = {};
+  rooms.forEach((room, id) => {
+    info[id] = { clients: room.clients.size, hasLocation: !!room.location };
+  });
+  res.json({ rooms: info, totalRooms: rooms.size });
+});
 app.get('/get_data', (req, res) => {
   const roomId = req.query.room || 'default';
   const room   = rooms.get(roomId);
@@ -181,7 +188,14 @@ wss.on('connection', (ws, req) => {
       isCam  = true;
       getRoom(roomId); // ensure room exists
       console.log(`[WS CAM] registered room=${roomId}`);
-      ws.send(JSON.stringify({ type: 'cam_ack', ok: true }));
+      const ack = JSON.stringify({ type: 'cam_ack', ok: true });
+      console.log(`[WS CAM] sending ack: ${ack}`);
+      try {
+        ws.send(ack);
+        console.log(`[WS CAM] ack sent successfully`);
+      } catch(e) {
+        console.error(`[WS CAM] ack send failed: ${e.message}`);
+      }
       return;
     }
 
