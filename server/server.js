@@ -85,7 +85,7 @@ app.use(express.json({ limit: '10kb' }));
 app.use((req, res, next) => {
   const allowed = [
     'https://sigmawebapp-production.up.railway.app',
-    'https://hopeful-ambition-production-82bb042a.up.railway.app',
+    'https://hopeful-ambition-production-8119be7a.up.railway.app',
     'http://localhost:3000',
     'http://localhost:5173',
   ];

@@ -12,7 +12,7 @@
 #include <Preferences.h>
 
 // ── Config ────────────────────────────────────────────────
-#define WS_HOST "hopeful-ambition-production-82bb042a.up.railway.app"
+#define WS_HOST "hopeful-ambition-production-8119be7a.up.railway.app"
 #define WS_PORT 443
 #define WS_PATH "/"
 
@@ -140,7 +140,8 @@ void onWsEvent(WStype_t type, uint8_t* payload, size_t length) {
       g_registered  = false;
       break;
     case WStype_ERROR:
-      Serial.println("[WS] Error");
+      Serial.printf("[WS] Error len=%u\n", (unsigned)length);
+      if (payload && length) Serial.printf("[WS] Error data: %s\n", (char*)payload);
       break;
     default: break;
   }
@@ -206,7 +207,8 @@ void setup() {
 
   ws.beginSSL(WS_HOST, WS_PORT, WS_PATH);
   ws.onEvent(onWsEvent);
-  ws.setReconnectInterval(3000);
+  ws.setReconnectInterval(5000);
+  ws.setExtraHeaders("Host: hopeful-ambition-production-8119be7a.up.railway.app");
   Serial.printf("[WS] Connecting to %s\n", WS_HOST);
 }
 
