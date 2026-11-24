@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- outer dark blob outline — thick black stroke for hand-cut sticker feel -->
+  <path d="M100 12
+    C84 12 70 17 61 26
+    C52 22 40 22 32 30
+    C22 38 20 52 26 62
+    C18 70 14 82 18 94
+    C14 106 18 120 28 128
+    C26 140 30 154 42 160
+    C50 172 64 176 76 172
+    C84 180 94 184 104 182
+    C116 184 128 178 134 168
+    C146 170 158 164 164 154
+    C174 148 178 134 174 122
+    C182 114 184 100 180 88
+    C184 76 180 62 170 56
+    C172 44 166 32 154 28
+    C146 18 132 14 120 18
+    C114 14 106 12 100 12Z"
+    fill="#111" />
+  <!-- main green cloud -->
+  <path d="M100 18
+    C85 18 72 23 64 32
+    C56 28 45 29 38 37
+    C29 45 28 58 34 68
+    C26 77 23 89 27 100
+    C23 112 28 125 38 132
+    C37 144 42 156 53 162
+    C61 172 74 175 86 170
+    C94 177 103 180 113 178
+    C124 179 135 173 140 163
+    C152 164 163 157 168 147
+    C176 140 179 127 174 115
+    C181 107 183 94 178 83
+    C181 72 177 59 168 53
+    C169 42 163 31 152 27
+    C144 18 131 15 120 19
+    C114 16 107 15 100 18Z"
+    fill="#47D88A" />
+  <!-- inner highlight sheen -->
+  <ellipse cx="72" cy="52" rx="22" ry="13" fill="#fff" opacity="0.22" transform="rotate(-25,72,52)"/>
+  <!-- thick white checkmark -->
+  <polyline
+    points="52,102 82,136 152,68"
+    fill="none"
+    stroke="#fff"
+    stroke-width="18"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+  <!-- checkmark inner shadow for depth -->
+  <polyline
+    points="52,102 82,136 152,68"
+    fill="none"
+    stroke="rgba(0,0,0,0.12)"
+    stroke-width="10"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    transform="translate(3,4)"/>
+  <!-- checkmark white re-draw on top -->
+  <polyline
+    points="52,102 82,136 152,68"
+    fill="none"
+    stroke="#fff"
+    stroke-width="15"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+</svg>
