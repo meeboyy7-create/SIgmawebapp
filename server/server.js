@@ -162,17 +162,19 @@ wss.on('connection', (ws, req) => {
   let roomId = null;
   let isCam  = false;
 
+  // Increase socket buffer size for binary frames
+  ws._socket.setNoDelay(true);
+
   ws.on('message', (raw, isBinary) => {
 
     // ── Binary = JPEG frame from ESP32-CAM ──────────────
     if (isBinary) {
-      if (!roomId) return; // cam must register first
+      if (!roomId) return;
       const room = rooms.get(roomId);
       if (!room) return;
-      // Relay raw JPEG to all dashboard clients in this room
       room.clients.forEach(client => {
         if (client !== ws && client.readyState === 1) {
-          client.send(raw, { binary: true });
+          try { client.send(raw, { binary: true }); } catch(e) {}
         }
       });
       return;
@@ -182,24 +184,15 @@ wss.on('connection', (ws, req) => {
     let data;
     try { data = JSON.parse(raw); } catch { return; }
 
-    // ── ESP32-CAM registers its room ─────────────────────
     if (data.type === 'cam' && data.roomId) {
       roomId = data.roomId;
       isCam  = true;
-      getRoom(roomId); // ensure room exists
+      getRoom(roomId);
       console.log(`[WS CAM] registered room=${roomId}`);
-      const ack = JSON.stringify({ type: 'cam_ack', ok: true });
-      console.log(`[WS CAM] sending ack: ${ack}`);
-      try {
-        ws.send(ack);
-        console.log(`[WS CAM] ack sent successfully`);
-      } catch(e) {
-        console.error(`[WS CAM] ack send failed: ${e.message}`);
-      }
+      try { ws.send(JSON.stringify({ type: 'cam_ack', ok: true })); } catch(e) {}
       return;
     }
 
-    // ── Dashboard joins a room ───────────────────────────
     if (data.type === 'join' && data.roomId) {
       if (roomId && rooms.has(roomId)) {
         rooms.get(roomId).clients.delete(ws);
@@ -214,32 +207,23 @@ wss.on('connection', (ws, req) => {
       return;
     }
 
-    // ── Dashboard sends cam_reset → forward to ESP32 cam ─
     if (data.type === 'cam_reset' && data.roomId) {
       const room = rooms.get(data.roomId);
       if (room) {
         room.clients.forEach(client => {
           if (client !== ws && client.readyState === 1) {
-            client.send(JSON.stringify({ type: 'cam_reset' }));
-            console.log(`[WS] cam_reset forwarded to room=${data.roomId}`);
+            try { client.send(JSON.stringify({ type: 'cam_reset' })); } catch(e) {}
           }
         });
       }
       return;
     }
+
     if (data.type === 'gps' || (data.lat && data.lng)) {
       const rid = data.roomId || roomId || 'default';
       const loc = { lat: data.lat, lng: data.lng, accuracy: data.accuracy, timestamp: data.timestamp || Date.now() };
       getRoom(rid).location = loc;
-      console.log(`[WS GPS] room=${rid}  ${loc.lat},${loc.lng}`);
-
       broadcast(rid, { type: 'location', ...loc });
-      if (rid !== 'default') broadcast('default', { type: 'location', ...loc });
-      rooms.forEach((room, rId) => {
-        if (rId !== rid && rId !== 'default' && room.clients.size > 0) {
-          broadcast(rId, { type: 'location', ...loc });
-        }
-      });
     }
   });
 
@@ -251,7 +235,18 @@ wss.on('connection', (ws, req) => {
     console.log('[WS] disconnected');
   });
 
-  ws.on('error', () => ws.terminate());
+  ws.on('error', (e) => { console.error('[WS] error:', e.message); ws.terminate(); });
+
+  // Keep-alive ping every 20s
+  const pingInterval = setInterval(() => {
+    if (ws.readyState === 1) {
+      ws.ping();
+    } else {
+      clearInterval(pingInterval);
+    }
+  }, 20000);
+
+  ws.on('close', () => clearInterval(pingInterval));
 });
 
 /* ── SPA fallback ────────────────────────────────────────── */
