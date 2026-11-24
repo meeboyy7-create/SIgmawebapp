@@ -165,7 +165,7 @@ wss.on('connection', (ws, req) => {
   ws.on('message', (raw, isBinary) => {
 
     // ── Binary = JPEG frame from ESP32-CAM ──────────────
-    if (isBinary || Buffer.isBuffer(raw)) {
+    if (isBinary) {
       if (!roomId) return; // cam must register first
       const room = rooms.get(roomId);
       if (!room) return;
