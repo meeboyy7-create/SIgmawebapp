@@ -97,19 +97,21 @@ void runCaptivePortal() {
   WiFi.mode(WIFI_AP);
   IPAddress apIP(192,168,4,1);
   WiFi.softAPConfig(apIP,apIP,IPAddress(255,255,255,0));
-  WiFi.softAP("SigmaVision-Setup");
+  WiFi.softAP("SigmaVision-Setup | 192.168.4.1");
   Serial.println("[PORTAL] Connect to 'SigmaVision-Setup' → open 192.168.4.1");
   dnsServer.setTTL(0);
   dnsServer.start(53,"*",apIP);
   httpServer.on("/",HTTP_GET,portalRoot);
   httpServer.on("/save",HTTP_POST,portalSave);
-  httpServer.on("/generate_204",HTTP_GET,[](){ httpServer.send(204,"text/plain",""); });
-  httpServer.on("/gen_204",HTTP_GET,[](){ httpServer.send(204,"text/plain",""); });
+  httpServer.on("/generate_204",HTTP_GET,[](){ httpServer.sendHeader("Location","http://192.168.4.1/",true); httpServer.send(302,"text/plain",""); });
+  httpServer.on("/gen_204",HTTP_GET,[](){ httpServer.sendHeader("Location","http://192.168.4.1/",true); httpServer.send(302,"text/plain",""); });
   httpServer.on("/hotspot-detect.html",HTTP_GET,portalRoot);
+  httpServer.on("/library/test/success.html",HTTP_GET,portalRoot);
   httpServer.on("/connecttest.txt",HTTP_GET,[](){ httpServer.send(200,"text/plain","Microsoft Connect Test"); });
   httpServer.on("/ncsi.txt",HTTP_GET,[](){ httpServer.send(200,"text/plain","Microsoft NCSI"); });
   httpServer.on("/success.txt",HTTP_GET,[](){ httpServer.send(200,"text/plain",""); });
-  httpServer.onNotFound(portalRedirect);
+  httpServer.on("/kindle-wifi/wifistub.html",HTTP_GET,portalRoot);
+  httpServer.onNotFound(portalRoot);  // serve portal for ALL unknown URLs
   httpServer.begin();
   while(true){dnsServer.processNextRequest();httpServer.handleClient();delay(2);}
 }
