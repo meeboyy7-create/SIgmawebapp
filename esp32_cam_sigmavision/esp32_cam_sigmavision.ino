@@ -121,6 +121,8 @@ void onWsEvent(WStype_t type, uint8_t* payload, size_t length) {
       Serial.println("[WS] Connected to Railway");
       g_wsConnected = true;
       g_registered  = false;
+      // Small delay to let Railway proxy stabilise before sending
+      delay(500);
       {
         String msg = String("{\"type\":\"cam\",\"roomId\":\"") + g_room + "\"}";
         ws.sendTXT(msg);
