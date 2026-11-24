@@ -209,13 +209,24 @@ wss.on('connection', (ws, req) => {
       isCam  = false;
       getRoom(roomId).clients.add(ws);
       console.log(`[WS] join room=${roomId}  size=${rooms.get(roomId).clients.size}`);
-
       const room = rooms.get(roomId);
       if (room.location) ws.send(JSON.stringify({ type: 'location', ...room.location }));
       return;
     }
 
-    // ── Mobile sends GPS ─────────────────────────────────
+    // ── Dashboard sends cam_reset → forward to ESP32 cam ─
+    if (data.type === 'cam_reset' && data.roomId) {
+      const room = rooms.get(data.roomId);
+      if (room) {
+        room.clients.forEach(client => {
+          if (client !== ws && client.readyState === 1) {
+            client.send(JSON.stringify({ type: 'cam_reset' }));
+            console.log(`[WS] cam_reset forwarded to room=${data.roomId}`);
+          }
+        });
+      }
+      return;
+    }
     if (data.type === 'gps' || (data.lat && data.lng)) {
       const rid = data.roomId || roomId || 'default';
       const loc = { lat: data.lat, lng: data.lng, accuracy: data.accuracy, timestamp: data.timestamp || Date.now() };

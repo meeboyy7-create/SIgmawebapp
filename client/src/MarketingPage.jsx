@@ -985,6 +985,35 @@ export default function MarketingPage({ onEnter, user, onLogout }) {
                   style={{ width:'100%', padding:'12px 14px', borderRadius:6, border:`2px solid ${S.carbon}`, fontFamily:S.f.mono, fontSize:12, color:S.carbon, background:S.sky, outline:'none', boxSizing:'border-box' }}/>
                 <p style={{ fontFamily:S.f.ui, fontSize:11, color:S.carbon, opacity:.45, margin:'8px 0 20px', lineHeight:1.5 }}>Paste your ESP32-CAM streaming URL. Make sure your device is on the same network.</p>
 
+                {/* ── Room ID copy ── */}
+                <div style={{ borderTop:`1.5px solid rgba(0,0,0,0.1)`, paddingTop:16, marginBottom:16 }}>
+                  <label style={{ fontFamily:S.f.mono, fontSize:10, letterSpacing:'0.14em', textTransform:'uppercase', color:S.carbon, opacity:.5, display:'block', marginBottom:8 }}>Your Room ID</label>
+                  <div style={{ display:'flex', gap:8 }}>
+                    <input readOnly value={user?.uid || '—'} style={{ flex:1, padding:'11px 13px', borderRadius:6, border:`2px solid ${S.carbon}`, fontFamily:S.f.mono, fontSize:11, color:S.carbon, background:S.sky, outline:'none', boxSizing:'border-box', letterSpacing:'0.04em' }}/>
+                    <button onClick={() => { if (user?.uid) navigator.clipboard.writeText(user.uid); }}
+                      style={{ padding:'0 14px', borderRadius:6, border:`2px solid ${S.carbon}`, background:S.mint, fontFamily:S.f.ui, fontWeight:700, fontSize:12, color:S.carbon, cursor:'pointer', whiteSpace:'nowrap', boxShadow:`2px 2px 0 ${S.carbon}` }}>
+                      Copy
+                    </button>
+                  </div>
+                  <p style={{ fontFamily:S.f.ui, fontSize:11, color:S.carbon, opacity:.45, margin:'6px 0 0', lineHeight:1.5 }}>Paste this into the ESP32 setup page (192.168.4.1)</p>
+                </div>
+
+                {/* ── Reset camera setup ── */}
+                <div style={{ borderTop:`1.5px solid rgba(0,0,0,0.1)`, paddingTop:16, marginBottom:20 }}>
+                  <label style={{ fontFamily:S.f.mono, fontSize:10, letterSpacing:'0.14em', textTransform:'uppercase', color:S.carbon, opacity:.5, display:'block', marginBottom:8 }}>Reset Camera WiFi</label>
+                  <button onClick={() => {
+                    if (wsRef.current && wsRef.current.readyState === 1) {
+                      wsRef.current.send(JSON.stringify({ type: 'cam_reset', roomId: user?.uid }));
+                      alert('Reset command sent — ESP32 will reboot into setup mode in a few seconds. Connect to SigmaVision-Setup WiFi.');
+                    } else {
+                      alert('Not connected to server. Make sure you are signed in and online.');
+                    }
+                  }} style={{ width:'100%', padding:'11px', borderRadius:6, border:`2px solid ${S.ember}`, background:'transparent', fontFamily:S.f.ui, fontWeight:700, fontSize:13, color:S.ember, cursor:'pointer' }}>
+                    Reset ESP32 Camera Setup
+                  </button>
+                  <p style={{ fontFamily:S.f.ui, fontSize:11, color:S.carbon, opacity:.35, margin:'6px 0 0', lineHeight:1.5 }}>Use this to change WiFi or Room ID without touching the board</p>
+                </div>
+
                 {/* ── Room ID copy — for ESP32 captive portal setup ── */}
                 <div style={{ borderTop:`1.5px solid rgba(0,0,0,0.1)`, paddingTop:16, marginBottom:20 }}>
                   <label style={{ fontFamily:S.f.mono, fontSize:10, letterSpacing:'0.14em', textTransform:'uppercase', color:S.carbon, opacity:.5, display:'block', marginBottom:8 }}>Your Room ID</label>

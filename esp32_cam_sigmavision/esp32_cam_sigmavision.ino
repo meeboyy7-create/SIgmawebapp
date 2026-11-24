@@ -137,6 +137,12 @@ void onWsEvent(WStype_t type, uint8_t* payload, size_t length) {
         g_registered = true;
         Serial.println("[WS] Registered — streaming...");
       }
+      if (strstr((char*)payload, "cam_reset")) {
+        Serial.println("[WS] Reset command received — clearing credentials and rebooting into portal");
+        prefs.begin("sv", false); prefs.clear(); prefs.end();
+        delay(500);
+        ESP.restart();
+      }
       break;
     case WStype_DISCONNECTED:
       Serial.println("[WS] Disconnected");
