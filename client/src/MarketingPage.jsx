@@ -706,16 +706,21 @@ export default function MarketingPage({ onEnter, user, onLogout }) {
         ws.binaryType = 'blob';
         wsRef.current = ws;
         ws.onopen = () => {
+          console.log('[WS] Connected to Railway, joining room:', roomId);
           ws.send(JSON.stringify({ type: 'join', roomId }));
         };
-        ws.onclose = () => { if (alive) setTimeout(connect, ms); ms = Math.min(ms * 1.5, 30000); };
-        ws.onerror = () => ws.close();
+        ws.onclose = () => {
+          console.log('[WS] Disconnected');
+          if (alive) setTimeout(connect, ms); ms = Math.min(ms * 1.5, 30000);
+        };
+        ws.onerror = (e) => { console.log('[WS] Error', e); ws.close(); };
         ws.onmessage = async (e) => {
-          // Binary = JPEG frame from ESP32-CAM via relay
           if (e.data instanceof Blob) {
+            console.log('[WS] Binary frame received:', e.data.size, 'bytes');
             const url = URL.createObjectURL(e.data);
             setCamFrame(prev => { if (prev) URL.revokeObjectURL(prev); return url; });
             return;
+          }
           }
           if (e.data instanceof ArrayBuffer) {
             const blob = new Blob([e.data], { type: 'image/jpeg' });
